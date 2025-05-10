@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Basketball</string>
+    <string name="header_team">TEAM</string>
+    <string name="tab_01">Schedule</string>
+    <string name="tab_02">Game</string>
+
+</resources>
