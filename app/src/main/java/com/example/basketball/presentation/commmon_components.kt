@@ -1,5 +1,6 @@
 package com.example.basketball.presentation
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,13 +56,12 @@ fun ShowLoading(modifier: Modifier = Modifier) {
     val strokeWidth = 5.dp
     Box(
         modifier = Modifier
-            .size(width = 200.dp, height = 80.dp)
-            .background(Color.Black)
+            .fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
         Row(
-            modifier = Modifier.fillMaxSize(),
-            Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
@@ -72,7 +72,6 @@ fun ShowLoading(modifier: Modifier = Modifier) {
             SpacerWidth(15.dp)
             Text(
                 text = "Loading..",
-                modifier = modifier,
                 style = TextStyle(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,

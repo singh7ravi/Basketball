@@ -1,34 +1,51 @@
 package com.example.basketball.domain.utils
 
+import com.example.basketball.data.local.model.ScheduleItem
 import com.example.basketball.data.local.model.Team
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 object Utility {
-    fun convertUtcToLocalDayLabel(utcTime: String): String {
-        return try {
-            val zonedUtc = ZonedDateTime.parse(utcTime)
-            val localDate = zonedUtc.withZoneSameInstant(ZoneId.systemDefault())
-            localDate.format(DateTimeFormatter.ofPattern("EEE MMM dd", Locale.US)).uppercase()
-        } catch (e: Exception) {
-            "INVALID DATE"
+    fun filterUsersItemsByNamePrefix(
+        scheduleItems: List<ScheduleItem>,
+        prefix: String
+    ): List<ScheduleItem> {
+        val filtered = scheduleItems.filter {
+            it.arena_name.startsWith(prefix, ignoreCase = true)
+                    || it.arena_city.startsWith(prefix, ignoreCase = true)
         }
+        println("Filtering with prefix: '$prefix' found ${filtered.size} items")
+        return filtered
     }
 
-    fun convertEtTimeToDisplay(input: String): String {
-        return try {
-            val cleaned = input
-                .replace("ET", "", ignoreCase = true) // remove timezone
-                .trim()
-                .replace(" ", "")                     // remove space between time and am/pm
-                .uppercase()                          // uppercase entire string
+    fun getFilterListByOption(
+        scheduleItems: List<ScheduleItem>,
+        filters: List<FilterType>
+    ): List<ScheduleItem> {
+        if (filters.isEmpty()) return scheduleItems
 
-            cleaned
-        } catch (e: Exception) {
-            "INVALID TIME"
+        // Map filters to the corresponding `st` values
+        val allowedStValues = filters.map { filter ->
+            when (filter) {
+                FilterType.FUTURE -> 1
+                FilterType.LIVE -> 2
+                FilterType.PAST -> 3
+            }
         }
+
+        // Filter users based on matching st values
+        return scheduleItems.filter { it.st in allowedStValues }
+    }
+
+    fun filterUsersByGameType(list: List<String>): List<FilterType> {
+        var listType = listOf<FilterType>()
+        listType = list.mapNotNull { filter ->
+            try {
+                val cleaned = filter.replace(" GAME", "", ignoreCase = true).trim().uppercase()
+                FilterType.valueOf(cleaned) // Convert string to enum
+            } catch (e: IllegalArgumentException) {
+                null // Ignore invalid values
+            }
+        }
+        return listType
     }
 
     fun getTeamLogo(teamId: String, teamsList: List<Team>): String {
@@ -37,5 +54,4 @@ object Utility {
     fun getTeam(teamId: String, teamsList: List<Team>): String {
         return teamsList.firstOrNull { it.tid == teamId }?.tn ?: ""
     }
-
 }

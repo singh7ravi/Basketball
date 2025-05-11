@@ -1,41 +1,51 @@
 package com.example.basketball.domain.utils
 
 import com.example.basketball.data.local.model.ScheduleItem
-import kotlin.collections.any
-import kotlin.collections.filter
-import kotlin.text.lowercase
-import kotlin.text.startsWith
+import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.TimeZone
 
 
 object Converter {
-
-    fun filterUsersItemsByNamePrefix(
-        scheduleItems: List<ScheduleItem>,
-        prefix: String
-    ): List<ScheduleItem> {
-        return scheduleItems.filter {
-            it.arena_name.startsWith(prefix, ignoreCase = true)
-                    || it.arena_city.startsWith(prefix, ignoreCase = true)
+    fun convertUtcToLocalDayLabel(utcTime: String): String {
+        return try {
+            val zonedUtc = ZonedDateTime.parse(utcTime)
+            val localDate = zonedUtc.withZoneSameInstant(ZoneId.systemDefault())
+            localDate.format(DateTimeFormatter.ofPattern("EEE MMM dd", Locale.US)).uppercase()
+        } catch (e: Exception) {
+            "INVALID DATE"
         }
     }
 
-    fun getFilterListByOption(
-        scheduleItems: List<ScheduleItem>,
-        filters: List<FilterType>
-    ): List<ScheduleItem> {
-        if (filters.isEmpty()) return scheduleItems
+    fun convertEtTimeToDisplay(input: String): String {
+        return try {
+            val cleaned = input
+                .replace("ET", "", ignoreCase = true) // remove timezone
+                .trim()
+                .replace(" ", "")                     // remove space between time and am/pm
+                .uppercase()                          // uppercase entire string
 
-        // Map filters to the corresponding `st` values
-        val allowedStValues = filters.map { filter ->
-            when (filter) {
-                FilterType.FUTURE -> 1
-                FilterType.LIVE -> 2
-                FilterType.PAST -> 3
-            }
+            cleaned
+        } catch (e: Exception) {
+            "INVALID TIME"
         }
+    }
+    fun extractUniqueMonthYearList(scheduleList: List<ScheduleItem>): List<String> {
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+        val outputFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+        inputFormat.timeZone = TimeZone.getTimeZone("UTC")
 
-        // Filter users based on matching st values
-        return scheduleItems.filter { it.st in allowedStValues }
+        return scheduleList.mapNotNull { item ->
+            try {
+                val date = inputFormat.parse(item.gametime)
+                outputFormat.format(date!!).uppercase()
+            } catch (e: Exception) {
+                null
+            }
+        }.distinct()
     }
 
 }

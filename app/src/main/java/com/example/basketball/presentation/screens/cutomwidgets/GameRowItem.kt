@@ -31,7 +31,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.basketball.data.local.model.Broadcaster
 import com.example.basketball.data.local.model.TeamInfo
-import com.example.basketball.domain.utils.Utility
+import com.example.basketball.domain.utils.Converter.convertEtTimeToDisplay
+import com.example.basketball.domain.utils.Converter.convertUtcToLocalDayLabel
 import com.example.basketball.presentation.SpacerHeight
 
 @Composable
@@ -74,7 +75,7 @@ fun GameRowItem(
                         .background(Color.Gray)
                 )
                 Text(
-                    text = Utility.convertUtcToLocalDayLabel(date),
+                    text = convertUtcToLocalDayLabel(date),
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall
                 )
@@ -89,7 +90,7 @@ fun GameRowItem(
                     if(gameStatus != 1 && statusList?.size == 2){
                         status02 = statusList.get(2).scope?.toUpperCase() ?: ""
                     }else{
-                        status02 = Utility.convertEtTimeToDisplay(stt)
+                        status02 = convertEtTimeToDisplay(stt)
                     }
                     Text(
                         text = status02,

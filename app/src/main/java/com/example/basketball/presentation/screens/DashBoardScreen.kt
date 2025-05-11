@@ -1,5 +1,6 @@
 package com.example.basketball.presentation.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,13 +44,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.basketball.R
-import com.example.basketball.data.local.model.ScheduleResponse
+import com.example.basketball.data.local.model.ScheduleItem
 import com.example.basketball.data.local.model.Team
 import com.example.basketball.domain.utils.filterCategories
 import com.example.basketball.presentation.FilterBottomSheet
 import com.example.basketball.data.local.model.TeamInfo
 import com.example.basketball.domain.utils.ApiState
+import com.example.basketball.domain.utils.Converter
+import com.example.basketball.domain.utils.Converter.extractUniqueMonthYearList
 import com.example.basketball.domain.utils.Utility
+import com.example.basketball.domain.utils.Utility.filterUsersByGameType
 import com.example.basketball.presentation.ShowLoading
 import com.example.basketball.presentation.screens.cutomwidgets.GameRowItem
 import com.example.basketball.presentation.screens.cutomwidgets.MonthYearDropdown
@@ -63,29 +68,25 @@ fun DashBoardScreen(
     var functionCalled by remember { mutableStateOf(false) }
     var showBottomSheet by remember { mutableStateOf(false) }
     val selectedCategories = remember { mutableStateListOf<String>() }
-   // val filters = remember { mutableStateListOf<FilterType>() }
-
-
+    var selectedTabIndex by remember { mutableStateOf(0) }
 
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 showBottomSheet = true
                 selectedCategories.clear()
-
             }) {
                 Icon(Icons.Default.FilterList, contentDescription = "Filter")
             }
         }
     ) {
         Box(modifier = Modifier.padding(it)) {
-             TeamHeaderWithTabs(0, mainViewModel) {
-             }
+            TeamHeaderWithTabs(selectedTabIndex =  selectedTabIndex, onTabSelected = {
+                selectedTabIndex = it
+            })
             LaunchedEffect(Unit) {
                 mainViewModel.getScheduleData()
             }
-
-
             if (showBottomSheet) {
                 FilterBottomSheet(
                     filterCategories = filterCategories,
@@ -103,7 +104,9 @@ fun DashBoardScreen(
 
             LaunchedEffect(functionCalled) {
                 if (functionCalled) {
-
+                    mainViewModel.getFilterListByOption(
+                        filterUsersByGameType(selectedCategories.toList())
+                    )
                     functionCalled = false // Reset the flag
                 }
             }
@@ -120,12 +123,11 @@ fun TeamHeaderWithTabs(
     val scheduleState by mainViewModel.scheduleState.collectAsState()
     val teamsState by mainViewModel.teamsState.collectAsState()
 
-    var selectedMonth by remember { mutableStateOf("JULY 2023") }
-    val allMonths = listOf("JUNE 2023", "JULY 2023", "AUGUST 2023")
+    var selectedMonth by remember { mutableStateOf("MAY 2025") }
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .background(Color.Black)
     ) {
         // Header Title
@@ -136,11 +138,15 @@ fun TeamHeaderWithTabs(
                 .padding(top = 16.dp, bottom = 8.dp),
             textAlign = TextAlign.Center,
             color = Color.White,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic)
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                fontStyle = FontStyle.Italic
+            )
         )
 
         // Tabs
-        val tabs = listOf(stringResource(id = R.string.tab_01), stringResource(id = R.string.tab_02))
+        val tabs =
+            listOf(stringResource(id = R.string.tab_01), stringResource(id = R.string.tab_02))
 
         TabRow(
             selectedTabIndex = selectedTabIndex,
@@ -169,75 +175,119 @@ fun TeamHeaderWithTabs(
                 )
             }
         }
-        MonthYearDropdown(
-            selectedMonthYear = selectedMonth,
-            monthYearOptions = allMonths,
-            onMonthYearSelected = { selectedMonth = it }
-        )
 
-        when (scheduleState) {
+        when (val result = mainViewModel.response.value) {
             is ApiState.Loading -> ShowLoading()
             is ApiState.Success -> {
-                val scheduleData = (scheduleState as ApiState.Success).data
-                LaunchedEffect(scheduleState) {
+                val scheduleList = result.data
+                val monthYearList = extractUniqueMonthYearList(scheduleList)
+
+                MonthYearDropdown(
+                    selectedMonthYear = selectedMonth,
+                    monthYearOptions = monthYearList,
+                    onMonthYearSelected = {
+                        selectedMonth = it
+                    }
+                )
+
+                LaunchedEffect(Unit) {
                     mainViewModel.getTeams()
                 }
-                when(teamsState){
+                when (teamsState) {
                     is ApiState.Loading -> ShowLoading()
                     is ApiState.Success -> {
                         val teamsData = (teamsState as ApiState.Success).data
-                          showScheduleList(scheduleData, teamsData)
+                        showScheduleList(result.data, teamsData)
                     }
+
                     is ApiState.Failure -> Text("Error: ${(teamsState as ApiState.Failure).msg.message}")
-                    ApiState.Empty -> Text("No data")
+                    ApiState.Empty -> Text("No data 1")
                 }
             }
-            is ApiState.Failure -> Text("Error: ${(scheduleState as ApiState.Failure).msg.message}")
-            ApiState.Empty -> Text("No data")
-        }
 
+            is ApiState.Failure -> Text("Error: ${(scheduleState as ApiState.Failure).msg.message}")
+            ApiState.Empty -> Text("No data 2")
+        }
 
 
     }
 }
-@Composable
-fun showScheduleList(data: ScheduleResponse, teamsList: List<Team>, mainViewModel: MainViewModel = hiltViewModel()){
 
+@Composable
+fun showScheduleList(
+    data: List<ScheduleItem>,
+    teamsList: List<Team>,
+    mainViewModel: MainViewModel = hiltViewModel()
+) {
+    val viewState by mainViewModel.scheduleState.collectAsState()
     val searchItem = remember { mutableStateOf("") }
-    LazyColumn(
+    OutlinedTextField(
         modifier = Modifier
-            .fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    )  {
-        item {
-        OutlinedTextField(
+            .fillMaxWidth()
+            .padding(10.dp)
+        ,
+        value = searchItem.value,
+        onValueChange = { searchText ->
+            searchItem.value = searchText
+            mainViewModel.getFilterListByAutherTeamPlace(data, searchText)
+        },
+        leadingIcon = {
+            Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color.White)
+        },
+        textStyle = TextStyle(color = Color.White),
+        placeholder = {
+            Text(
+                "Search", color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    )
+
+    if (viewState.filterList.isEmpty()) {
+        Text(
+            text = stringResource(id = R.string.data_not_found),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp)
-                .background(color = Color.White),
-            value = searchItem.value,
-            onValueChange = { searchText ->
-                searchItem.value = searchText
-                mainViewModel.getFilterListByAutherTeamPlace(data.data.schedules, searchText)
+                .padding(16.dp),
+            textAlign = TextAlign.Center,
+            color = Color.White,
+            fontWeight = FontWeight.Bold
 
-            },
-            leadingIcon = {
-                Icon(imageVector = Icons.Default.Search, contentDescription = "")
-            })
-    }
-        items(data.data.schedules) { item ->
-            //Text("Arena: ${item.arena_name}, Game Time: ${item.gametime}")
-            GameRowItem(
-                autherName = item.arena_name,
-                city = item.arena_city,
-                teamName = Utility.getTeam(item.h.tid, teamsList),
-                gameStatus = item.st,
-                stt = item.stt,
-                date = item.gametime,
-                statusList = item.bd?.b,
-                homeTeam = TeamInfo(tid = item.h.tid, tn = item.h.tn, ta = item.h.ta, tc = item.h.tc, logo = Utility.getTeamLogo(item.h.tid, teamsList), s = item.h.s),
-                awayTeam = TeamInfo(tid = item.v.tid, tn = item.v.tn, ta = item.v.ta, tc = item.v.tc, logo = Utility.getTeamLogo(item.v.tid, teamsList),s = item.v.s),
-            )
+        )
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (viewState.filterList.isNotEmpty()) items(items = viewState.filterList) { item ->
+                GameRowItem(
+                    autherName = item.arena_name,
+                    city = item.arena_city,
+                    teamName = Utility.getTeam(item.h.tid, teamsList),
+                    gameStatus = item.st,
+                    stt = item.stt,
+                    date = item.gametime,
+                    statusList = item.bd?.b,
+                    homeTeam = TeamInfo(
+                        tid = item.h.tid,
+                        tn = item.h.tn,
+                        ta = item.h.ta,
+                        tc = item.h.tc,
+                        logo = Utility.getTeamLogo(item.h.tid, teamsList),
+                        s = item.h.s
+                    ),
+                    awayTeam = TeamInfo(
+                        tid = item.v.tid,
+                        tn = item.v.tn,
+                        ta = item.v.ta,
+                        tc = item.v.tc,
+                        logo = Utility.getTeamLogo(item.v.tid, teamsList),
+                        s = item.v.s
+                    ),
+                )
+            }
         }
     }
 }
